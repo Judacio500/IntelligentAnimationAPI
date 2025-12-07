@@ -1,3 +1,5 @@
+
+
 #include"list.h"
 
 LIST *createElement(void *data, float weight)
@@ -9,6 +11,7 @@ LIST *createElement(void *data, float weight)
 
     newE->data = data;
     newE->next = NULL;
+    newE->prev = NULL;
     newE->weight = weight; // Aqui tenia  un 0
 
     return newE;
@@ -52,7 +55,7 @@ int append(QUEUE **q, void *data, float weight)
     LIST *newE = createElement(data,weight);
 
     if(!newE)
-        return NULL;
+        return -1;
 
     if(!(*q)->first && !(*q)->last)
     {
@@ -178,4 +181,110 @@ void *extract(LIST **l, void *search, Comparator compare)
         l = &(*l)->next;
     }
     return NULL;
+}
+
+int handleInsert(LIST **l, void *data, float weight, enum listType t)
+{
+    int returnCode;
+
+    switch(t)
+    {
+        case SIMPLE:
+            returnCode = insertList(l, data, weight);
+            break;
+        case DOUBLE:
+            returnCode = insertDouble(l,data,weight);
+    }
+    
+    return returnCode;
+}
+
+int handleAppend(QUEUE **q, void *data, float weight, enum listType t)
+{
+    int returnCode;
+
+    switch(t)
+    {
+        case SIMPLE:
+            returnCode = append(q, data, weight);
+            break;
+        case DOUBLE:
+            returnCode = appendDouble(q,data,weight);
+    }
+    
+    return returnCode;
+}
+
+int insertDouble(LIST **l, void *data, float weight)
+{
+    LIST *newE = createElement(data,weight);
+
+    if(!newE)
+        return -1;
+
+    newE->next = *l;
+    if(*l)
+        (*l)->prev = newE;
+    *l = newE;
+    
+    return 0;
+}
+
+int appendDouble(QUEUE **q, void *data, float weight)
+{
+        if(!*q)
+    {
+        *q = createWrap();
+        if(!*q)
+            return -1;
+    }
+
+    LIST *newE = createElement(data,weight);
+
+    if(!newE)
+        return -1;
+
+    if(!(*q)->first && !(*q)->last)
+    {
+        (*q)->first = newE;
+        (*q)->last  = newE;
+        return 0;
+    } 
+
+    (*q)->last->next = newE;
+    newE->prev = (*q)->last;
+    (*q)->last = newE;
+
+    return 0;
+}
+
+LIST *popDouble(LIST **l);  // La defino luego, es mas situacional que popData
+
+void *popDataDouble(LIST **l)
+{
+    void *data = popData(l);
+    
+    if(!data)
+        return NULL;
+
+    if(*l)
+        (*l)->prev = NULL;
+
+    return data;
+
+}
+
+LIST *dequeueDouble(QUEUE *q); // Lo mismo que popDouble
+
+void *dequeueDataDouble(QUEUE *q)
+{
+    void *data = dequeueData(q);
+
+    if(!data)
+        return NULL;
+
+    if((*q)->first)                 // Como dequeue data llama a popData esencialmente
+        (*q)->first->prev = NULL;   // (*q)->first es lo mismo que (*l) en las listas
+                                    // y por ende lo unico que hace falta desconectar es el prev
+                                    // del inicio
 }
