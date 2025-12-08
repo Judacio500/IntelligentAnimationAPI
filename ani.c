@@ -329,7 +329,7 @@ LIST *polygonOffSet(int sections, float radius)
     return offset;
 }
 
-L
+// Haciendo un merge
 
 LIST *lineOffSet()
 {
