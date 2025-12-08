@@ -288,3 +288,17 @@ void *dequeueDataDouble(QUEUE *q)
                                     // y por ende lo unico que hace falta desconectar es el prev
                                     // del inicio
 }
+
+int copyList(LIST *src, LIST **dst, enum listType t) // No es deep copy para eso necesitariamos un callback de copia
+{
+    if(!dst)
+        return NULL;
+
+    while(src)
+    {
+        handleAppend(dst, src->data, 0, t);
+        src = src->next;
+    }
+
+    return 0;
+}
