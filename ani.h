@@ -198,5 +198,11 @@ int addPanel(ANI *animation, PANEL *p);
 int addLayer(PANEL *p, LAYER *l);
 int addObject(PANEL *l, OBJECT *o);
 int addColission(OBJECT *o, F *colissionBox);
+F *generateFigure(enum figures f, float arg1, float arg2, float localX, float localY, float zPriority, float rotX, float rotY, float rotZ);
+LIST *triangleOffSet(float base, float height);
+LIST *lineOffSet(float length);
+LIST *circleOffSet(int smoothness, float radius);
+LIST *polygonOffSet(int segments, float radius);
+LIST *rectangleOffSet(float width, float length);
 
 #endif
