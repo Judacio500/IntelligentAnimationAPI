@@ -1,5 +1,23 @@
 #include "ani.h"
 
+// Creacion de estructuras
+
+/*
+
+Esta seccion no esta comentada en su mayoria porque las decisiones del diseño ya estan en el .h
+y la logica de estas funciones es sencilla, agarramos una bolsa del supermercado del tamaño que quieramos
+metemos lo que vamos a comprar para esa bolsa y cerramos la bolsa
+
+Basicamente...
+
+Damos memoria a la estructura
+Inicializamos con valores base y aprueba de crash
+
+Esta seccion aunque simple se asegura de que si algo sale mal, nuestra libreria tenga las herramientas para hacer
+el handling correcto
+
+*/
+
 COORD *initCoord(float x, float y, float z)
 {
     COORD *newC = (COORD*)malloc(sizeof(COORD));
@@ -14,7 +32,7 @@ COORD *initCoord(float x, float y, float z)
     return newC;
 }
 
-F *initFigure(LIST *pointOffSet, enum figures f)
+F *initFigure(LIST *pointOffSet, COORD *localPosition, COORD *localRotation, enum figures f)
 {
     F *newF = (F*)malloc(sizeof(F));
     
@@ -23,6 +41,35 @@ F *initFigure(LIST *pointOffSet, enum figures f)
 
     newF->offset = pointOffSet;
     newF->f = f;
+
+    if (localPosition)
+    {
+        newF->relPos = localPosition;
+    }
+    else
+    {
+        newF->relPos = initCoord(0, 0, 0);
+        if(!newF->relPos)
+        {
+            free(newF);
+            return NULL;
+        }
+    }
+
+    if (localRotation)
+    {
+        newF->relRot = localRotation;
+    }
+    else
+    {
+        newF->relRot = initCoord(0, 0, 0);
+        if(!newF->relRot)
+        {
+            free(newF->relPos);
+            free(newF);
+            return NULL;
+        }
+    }
 
     return newF;
 }
@@ -187,4 +234,110 @@ ANI *initAnimation()
     newA->panels = createWrap(); 
 
     return newA;
+}
+
+
+// Insercion de estructuras
+/*
+    Estos serian los dummys de insercion para usuario/funciones "inteligentes" AKA Automatas
+
+    Sirven para ensamblar la animacion manualmente especificando cada lista de objetos en un panel
+    Cada capa y cada comportamiento 
+
+    O para recibir las instrucciones de insercion de nuestras funciones inteligentes
+
+*/
+
+int addPanel(ANI *animation, PANEL *p)  // Esta funcion corresponde a la punta del iceberg
+{                                       // Cuando un panel esta terminado lo añade a la cola de la animacion 
+                                        // permitiendo siempre insertar al final de la animacion
+    if(!animation || !p)
+        return -1; // Panel no añadido
+
+    return handleAppend(&animation->panels,p,1,DOUBLE); // Insercion en lista doblemente enlazada
+}
+
+// Añadir una capa a un panel existente
+int addLayer(PANEL *p, LAYER *l)
+{
+    if(!p || !l) 
+        return -1;
+    
+    return saveKey(&p->layers, l->layerName, l); 
+}
+
+// Añadir un objeto a una capa específica
+int addObject(PANEL *l, OBJECT *o)
+{
+    if(!l || !o) 
+        return -1;
+
+    return saveKey(&l->objects, o->key, o);
+}
+
+/*
+
+    Estas dos funciones son similares porque a diferencia de los paneles
+    que son secuenciales, son muchos y son mas dificiles de describir
+
+    Los objetos y las capas de un panel son contados, son especificos del panel
+    y son unicos y relevantes para el contexto de la animacion
+
+    por eso su implementacion esta hecha mediante hash, de esta forma
+    se pueden buscar y modificar por como fueron insertados
+
+*/
+
+int addColission(OBJECT *o, F *colissionBox)
+{
+    if(!o || !colissionBox)
+        return -1;
+    
+    o->t->colissionBox = colissionBox;
+
+    return 0;
+}
+
+LIST *rectangleOffSet(float width, float length)
+{
+    LIST *offset = NULL;
+    float halfX = length/2;
+    float halfY = width/2;
+
+    // Vertice 1: Esquina superior izquierda
+    handleInsert(&offset,initCoord(-halfX, halfY, 0),0,SIMPLE);
+
+    // Vertice 2: Esquina superior derecha
+    handleInsert(&offset,initCoord(halfX, halfY, 0),0,SIMPLE);
+    
+    // Vertice 3: Esquina inferior derecha
+    handleInsert(&offset,initCoord(halfX, -halfY, 0),0,SIMPLE);
+    
+    // Vertice 4: Esquina inferior izquierda
+    handleInsert(&offset,initCoord(-halfX, -halfY, 0),0,SIMPLE);
+
+    return offset;
+}
+
+LIST *polygonOffSet(int sections, float radius)
+{
+    LIST *offset = NULL;
+    float half = side/2;
+
+    
+
+    return offset;
+}
+
+L
+
+LIST *lineOffSet()
+{
+    LIST *offsets = NULL;
+
+    // Linea horizontal unitaria
+    insertList(&offsets, initCoord(-0.5f, 0.0f, 0.0f), 0);
+    insertList(&offsets, initCoord(0.5f, 0.0f, 0.0f), 0);
+
+    return offsets;
 }

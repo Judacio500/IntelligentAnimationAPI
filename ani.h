@@ -77,7 +77,7 @@ typedef enum animationCycle
     FROZEN,     // Se queda quieto en su último frame dibujado
     HIDDEN,     // Deja de dibujarse 
     LOOP        // Reinicia su ciclo, para acciones rutinarias, como 4 frames de caminata/correr/saltar
-} LIFE;
+}LIFE;
 
 typedef struct animation
 {
@@ -96,6 +96,12 @@ typedef struct layer
 {
     char layerName[30];
     struct hash *objects;       // Lo que dibujamos
+    Behavior initialBehavior;   // Todos los objetos empiezan con un comportamiento IDLE
+                                // que en la API se define como a la espera de un trigger
+                                // ese comportamiento se puede cambiar en initialBehavior
+                                // que hace override del behavior inicial para todos sus hijos
+                                // de esta forma podemos inicializar un grupo de objetos que hacen algo en una capa
+                                // por defecto esto se inicializa en IDLE
 }LAYER;
 
 typedef struct scene
@@ -117,7 +123,10 @@ typedef struct object
     struct graph *bluePrint;         // Conciencia de nuestro objeto, todas las posibilidades del objeto en el mundo
     struct node *currentStatus;      // donde estoy en el mundo? como me veo respecto a mi posicion?
                                      // el estado de nuestro automata
-    Behavior brain;                  // Es la forma en la que se comporta nuestro automata
+    struct list *brainStack;         // Comportamiento del objeto respecto al entorno
+                                     // en forma de pila para poder hacer cambios acumulativos
+                                     // Ejemplo, si detecto salto empujo en la pila esa accion
+                                     // caigo al suelo, saco de la pila y puedo seguir corriendo
     enum animationCycle status;      // Auxiliar para la generacion de animaciones
 }OBJECT;
 
@@ -136,19 +145,35 @@ typedef struct transform
                                     // como ambos vienen de figuras que se calculan con offset sera un escalado perfecto
 }TRANSFORM;
 
+
+typedef struct brainBehavior 
+{
+    Behavior func; // Como se comporta el objeto en el estado actual
+    void *params;  // Parametros de comportamiento
+
+    /*
+        Me detengo aqui a hacer un parentesis porque con esta estructura podemos hacer un pairing ideal
+        de como funciona mi cerebro actual y con que funciona
+    */
+
+}BRAINB;
+
 typedef struct trigger 
 {
     Check check;                // El automata no sabe que acciones se deben tomar en un prefabricado
                                 // pero se le puede decir de que estar pendiente
     char *targetStatusKey;      // Como nuestro grafo tiene un hash un trigger puede estar siempre ligado
                                 // a un estado distinto de dibujado
-} TRIGGER;
+}TRIGGER;
 
 typedef struct fig
 {
-    struct list *offset; // Puntos a dibujar de la figura calculados mediante un offset
-                         // definido por el struct coordenada     
-    enum figures f;      // Figura a dibujar;
+    struct list *offset;            // Puntos a dibujar de la figura calculados mediante un offset
+                                    // definido por el struct coordenada   
+    struct coordinates *relPos;     // Las figuras de un objeto necesitan una posicion relativa para dibujarse
+    struct coordinates *localRot;   // Ademas para evitar funciones como "trianguloVolteado" o "rombo"
+                                    // Podemos darle una rotacion inicial   
+    enum figures f;                 // Figura a dibujar;
 }F;
 
 typedef struct coordinates
@@ -157,7 +182,7 @@ typedef struct coordinates
 }COORD;
 
 COORD *initCoord(float x, float y, float z);
-F *initFigure(LIST *pointOffSet, enum figures f);
+F *initFigure(LIST *pointOffSet, COORD *localPosition, COORD *localRotation, enum figures f);
 TRIGGER *initTrigger(Check check, char *targetStatusKey);
 TRANSFORM *initPhysics(F *colision, COORD *pos, COORD *scale, COORD *rotation);
 OBJECT *initObject(char *objectName, char *objectLayer, TRANSFORM initial, LIST *figures, GRAPH *bluePrint, Behavior brain);
@@ -165,5 +190,9 @@ SCENE *initScene(float width, float height);
 LAYER *initLayer(char *layerName);
 PANEL *initPanel(SCENE *camera);
 ANI *initAnimation();
+int addPanel(ANI *animation, PANEL *p);
+int addLayer(PANEL *p, LAYER *l);
+int addObject(PANEL *l, OBJECT *o);
+int addColission(OBJECT *o, F *colissionBox);
 
 #endif
