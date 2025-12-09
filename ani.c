@@ -552,7 +552,12 @@ PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects)
     LIST *current = objects;
     while(current)
     {
-        OBJECT *obj = (OBJECT*)current->data;
+        OBJECT *obj = instanceObject((OBJECT*)current->data); // Los paneles son instanciados
+                                                              // todos los objetos insertados son instancias
+                                                              // del objeto anterior, ninguno es el mismo
+                                                              // el transform es unico porque referencia a la posicion del objeto
+                                                              // en el panel de interes, como dibujamos desde esos datos
+                                                              // no puede ser compartido
         
         LAYER *targetLayer = NULL;
         EHASH *found = hashing(newP->layers, obj->layerKey);
@@ -569,8 +574,6 @@ PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects)
                 return NULL;
             }
         }
-
-        OBJ *copy = copyObj(obj);
 
         addObject(newP, targetLayer, obj);
 
@@ -638,22 +641,47 @@ OBJECT *instanceObject(OBJECT *template)
 
     */
 
-    OBJECT *newObj = initObject(objectName, layerName, NULL, figures);
+    OBJECT *newObj = initObject(template->objectName, template->layerName, NULL, template->figures); //Las figuras, el nombre y la capa se mantienen igual
     
-    if(!newObj) return NULL;
+    if(!newObj) 
+        return NULL;
 
-    // Cargar el estado base 
-    STATUS *idleSt = getBase(Idle);
-    if(idleSt)
+    COORD *newPos = NULL, *newScale = NULL, *newRot = NULL;
+
+    if(template->t)
     {
-        // Insertamos el IDLE en la pila (Bottom)
-        handleInsert(&newObj->statusStack, idleSt, 0, SIMPLE);
-        newObj->activeStatus = idleSt;
-
-        if(bluePrint)
-            newObj->activeStatus->animSequence = bluePrint;
-
+        newPos   = initCoord(template->t->globalPos->x, template->t->globalPos->y, template->t->globalPos->z);
+        newScale = initCoord(template->t->scale->x, template->t->scale->y, template->t->scale->z);
+        newRot   = initCoord(template->t->rotation->x, template->t->rotation->y, template->t->rotation->z);
+        
+        newObj->t = initPhysics(template->t->colissionBox, newPos, newScale, newRot);
+        
+        newObj->t->effectArea = template->t->effectArea;
     }
+
+    LIST *previousStack = NULL;
+    LIST *iter = template->statusStack;
+
+    // Volcar la pila
+    while(iter)
+    {
+        handleInsert(&previousStack, iter->data, 0, SIMPLE);
+        iter = iter->next;
+    }
+
+    // Rearmar la pila
+
+    while(previousStack)
+    {
+        handleInsert(&newObj->statusStack,popData(&previousStack),0,SIMPLE)
+    }
+
+    // Utilizamos los mismos estados porque al final solo guardaremose el dibujado, y el dibujado es independiente del estado,
+    // lo que iteraremos es la Cola paneles, no la animacion en si, utilizamos el mismo stack para ahorrar memoria
+    // y mantener integridad en la animacion
+
+    newObj->activeStatus = template->activeStatus;
+    newObj->currentFrame = template->currentFrame;
 
     return newObj;
 }
@@ -971,15 +999,38 @@ void Fall(OBJECT *self, int step, void *params, void *env)
          advanceAutomata(self);
 }
 
-int *animationSimple(ANI *toModify, SCENE *absolute, LIST *Objects, int frames)
+int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int frames)
 {
-    if(!toModify)
+    if(!toModify || !initialObjects || absolute)
         return -1;
 
     for(int i=0; i<frames; i++)
     {
-        PANEL *nextPanel = generatePanelFromObjects(absolute,objects);
-        
-        
+        PANEL *nextPanel = generatePanelFromObjects(absolute,initialObjects);   // Crea efectivamente un nuevo panel
+                                                                                // desde la lista de objetos
+                                                                                // los paneles son instanciados, ergo, sus componentes son individuales
+                                                                                // por lo que no hace falta copiar cada objeto, cada panel copia sus objetos despues de simular
+                                                                                // vida
+
+        if(!nextPanel)
+            return -1;
+
+        LIST *objects = initialObjects;
+
+        while(objects)
+        {
+            OBJECT *current = (OBJECT*)objects->data;
+
+            if(current->activeStatus && current->activeStatus->func)
+                current->activeStatus->func(current,i,current->activeStatus->params,nextPanel)  // Simulamos vida para la lista global de objetos 
+                                                                                                // esto es hermoso porque cada panel copia su propio estado de los objetos
+                                                                                                // al final de la animacion la lista esta lista para seguir con los estados anteriores
+                                                                                                // pero a lo mejor añadiendo nuevos triggers y asi la lista de objetos cambia de manera global
+            objects = objects->next;
+        }                       
+
+        addPanel(toModify,nextPanel);
     }
+
+    return 0;
 }
