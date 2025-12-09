@@ -28,7 +28,7 @@ typedef struct list
 
 LIST *createElement(void *data, float weight);
 QUEUE *createWrap();
-int insert(LIST **l, void *data, float weight);
+int insertList(LIST **l, void *data, float weight);
 int append(QUEUE **r, void *data, float weight);
 int orderedInsert(LIST **l, void *data, float weight);
 LIST *pop(LIST **l);

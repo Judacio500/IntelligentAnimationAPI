@@ -58,12 +58,12 @@ F *initFigure(LIST *pointOffSet, COORD *localPosition, COORD *localRotation, enu
 
     if (localRotation)
     {
-        newF->relRot = localRotation;
+        newF->localRot = localRotation;
     }
     else
     {
-        newF->relRot = initCoord(0, 0, 0);
-        if(!newF->relRot)
+        newF->localRot = initCoord(0, 0, 0);
+        if(!newF->localRot)
         {
             free(newF->relPos);
             free(newF);
@@ -165,7 +165,6 @@ OBJECT *initObject(char *objectName, char *layerName, TRANSFORM *initial, LIST *
     }
 
     newO->figures = figures;
-    newO->bluePrint = bluePrint;
     newO->statusStack = NULL;  // La pila de estados esta vacia 
     newO->activeStatus = NULL;
     newO->status = ALIVE; 
@@ -199,8 +198,8 @@ LAYER *initLayer(char *layerName, Behavior initialBehavior)
 
     newL->objects = initHash(0); 
 
-    newL->initialBehavior =  !initialBehavior ? getIdle() : initialBehavior;    // Si se define un estado inicial se aplica
-                                                                                // si no se le da el estado Idle
+    newL->initialBehavior =  !initialBehavior ? idle : initialBehavior;    // Si se define un estado inicial se aplica
+                                                                           // si no se le da el estado Idle
 
     return newL;
 }
@@ -213,7 +212,7 @@ PANEL *initPanel(SCENE *camera)
 
     newP->currentScene = camera;
     newP->layers = initHash(0);
-    LAYER *backGround = initLayer("BACKGROUND");
+    LAYER *backGround = initLayer("BACKGROUND", NULL);
     
     if(backGround)
         saveKey(&newP->layers, backGround->layerName, backGround);
@@ -415,16 +414,28 @@ F *generateFigure(enum figures figType, float arg1, float arg2, float localX, fl
     if(!rot)
     {
         free(pos);
-        freeList(&offSet,free);
+        freeList(&offSet,destroyCoord);
         return NULL;
     }
 
-    F *newF = initFigure(offSet,pos,rot,f);
+    F *newF = initFigure(offSet,pos,rot,figType);
 
     return newF;
 }
 
-F *generateColission(enum figures figType, arg1,  arg2)
+int destroyCoord(void *data)
+{
+    if(!data)
+        return -1;
+
+    COORD *toDest = (COORD*)data;
+
+    free(toDest);
+
+    return 0;
+}
+
+F *generateColission(enum figures figType, float arg1, float arg2)
 {
     LIST *offSet = getOffSet(figType, arg1, arg2);
 
@@ -441,11 +452,11 @@ F *generateColission(enum figures figType, arg1,  arg2)
     if(!rot)
     {
         free(pos);
-        freeList(&offSet,free);
+        freeList(&offSet,destroyCoord);
         return NULL;
     }
 
-    F *newF = initFigure(offSet,pos,rot,f);
+    F *newF = initFigure(offSet,pos,rot,figType);
 
     return newF;
 }
@@ -530,7 +541,7 @@ PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects)
         }
         else
         {
-            targetLayer = initLayer(obj->layerKey);
+            targetLayer = initLayer(obj->layerKey, NULL);
             if(addLayer(newP, targetLayer) < 0)
             {
                 return NULL;
@@ -616,7 +627,7 @@ OBJECT *instanceObject(char *objectName, char *layerName, TRANSFORM *initial, LI
         newObj->activeStatus = idleSt;
 
         if(bluePrint)
-            newObj->avtiveStatus->animSequence = bluePrint;
+            newObj->activeStatus->animSequence = bluePrint;
 
     }
 
@@ -631,4 +642,7 @@ STATUS *getIdle()
     return generateStatus(idle,NULL,NULL);
 }
 
-void idle(struct object *self, int step, void *params, void *env); // Solo declarada no definida
+void idle(struct object *self, int step, void *params, void *env) // Solo declarada no definida
+{
+    return;
+}

@@ -10,6 +10,7 @@
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
+#endif
 
 /*
     Para el desarrollo de esta API se tiene el siguiente planteamiento:
@@ -131,7 +132,7 @@ typedef struct object
                                      // Al tener pares logicos/visuales podemos definir comportamientos
                                      // precargados, como solo moverse o solo saltar modificables por el entorno
     enum animationCycle status;      // Auxiliar para la generacion de animaciones
-    struct status *activeStatus; 
+    struct statusPair *activeStatus; 
     struct node *currentFrame;
 }OBJECT;
 
@@ -184,14 +185,15 @@ COORD *initCoord(float x, float y, float z);
 F *initFigure(LIST *pointOffSet, COORD *localPosition, COORD *localRotation, enum figures f);
 TRIGGER *initTrigger(Check check, char *targetStatusKey);
 TRANSFORM *initPhysics(F *colision, COORD *pos, COORD *scale, COORD *rotation);
-OBJECT *initObject(char *objectName, char *layerName, TRANSFORM initial, LIST *figures);
+OBJECT *initObject(char *objectName, char *layerName, TRANSFORM *initial, LIST *figures);
 SCENE *initScene(float width, float height);
 LAYER *initLayer(char *layerName, Behavior initialBehavior);
 PANEL *initPanel(SCENE *camera);
 ANI *initAnimation();
+int destroyCoord(void *data);
 int addPanel(ANI *animation, PANEL *p);
 int addLayer(PANEL *p, LAYER *l);
-int addObject(PANEL *l, OBJECT *o);
+int addObject(LAYER *l, OBJECT *o);
 int addColission(OBJECT *o, F *colissionBox);
 F *generateFigure(enum figures f, float arg1, float arg2, float localX, float localY, float zPriority, float rotX, float rotY, float rotZ);
 LIST *triangleOffSet(float base, float height);
@@ -200,7 +202,7 @@ LIST *circleOffSet(int smoothness, float radius);
 LIST *polygonOffSet(int segments, float radius);
 LIST *rectangleOffSet(float width, float length);
 LIST *getOffSet(enum figures figType, float arg1, float arg2);
-F *generateColission(enum figures figType, arg1,  arg2);
+F *generateColission(enum figures figType, float arg1, float arg2);
 GRAPH *generateBluePrint(char *sequenceName, QUEUE *objectSequence, int type);
 void idle(struct object *self, int step, void *params, void *env);
 STATUS *generateStatus(Behavior func, struct graph *animationSequence, void *params);
@@ -208,9 +210,6 @@ int pushFrame(QUEUE *sequence, OBJECT *frameObj);
 int pushFigure(LIST **figureList, F *fig);
 PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects);
 OBJECT *instanceObject(char *objectName, char *layerName, TRANSFORM *initial, LIST *figures, GRAPH *bluePrint);
-
-// Cerebros base
-
-extern LAYER *background;
+STATUS *getIdle();
 
 #endif

@@ -283,10 +283,12 @@ void *dequeueDataDouble(QUEUE *q)
     if(!data)
         return NULL;
 
-    if((*q)->first)                 // Como dequeue data llama a popData esencialmente
-        (*q)->first->prev = NULL;   // (*q)->first es lo mismo que (*l) en las listas
+    if(q->first)                 // Como dequeue data llama a popData esencialmente
+        q->first->prev = NULL;   // (*q)->first es lo mismo que (*l) en las listas
                                     // y por ende lo unico que hace falta desconectar es el prev
                                     // del inicio
+
+    return data;
 }
 
 int copyList(LIST *src, LIST **dst, enum listType t) // No es deep copy para eso necesitariamos un callback de copia
@@ -296,7 +298,7 @@ int copyList(LIST *src, LIST **dst, enum listType t) // No es deep copy para eso
 
     while(src)
     {
-        handleAppend(dst, src->data, 0, t);
+        handleInsert(dst, src->data, 0, t);
         src = src->next;
     }
 
