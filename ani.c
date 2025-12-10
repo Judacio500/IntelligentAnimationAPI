@@ -1034,3 +1034,4 @@ int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int fr
 
     return 0;
 }
+
