@@ -4,6 +4,7 @@
 #include<stdio.h>
 #include<string.h> 
 #include<math.h>
+#include<GL/glut.h>
 #include"list.h" 
 #include"graph.h" 
 #include"hash.h"  
@@ -243,9 +244,10 @@ STATUS *generateStatus(Behavior func, struct graph *animationSequence, void *par
 int pushFrame(QUEUE *sequence, OBJECT *frameObj);
 int pushFigure(LIST **figureList, F *fig);
 PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects);
-OBJECT *instanceObject(char *objectName, char *layerName, TRANSFORM *initial, LIST *figures, GRAPH *bluePrint);
+OBJECT *instanceObject(OBJECT *tmplt);
 STATUS *getBase(Behavior func);
 void calculateDimensions(OBJECT *obj);
+int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int frames);
 
 // Cerebros, fisicas y triggers
 void Static(struct object *self, int step, void *params, void *env);
@@ -257,5 +259,16 @@ int advanceAutomata(OBJECT *obj);
 void physicsUpdate(OBJECT *self, GP *p);
 int checkTriggers(OBJECT *self, GP *params, void *env);
 int checkGround(OBJECT *self, void *env);
+
+// OpenGL
+void drawFigure(F *fig);
+void drawObject(OBJECT *obj);
+void display();
+void reshape(int w, int h);
+void timer(int v);
+void keyboard(unsigned char key, int x, int y);
+void special(int key, int x, int y);
+void startGraphicsLoop(ANI *ani, int argc, char **argv, char *title);
+int checkVision(OBJECT *self, void *env);
 
 #endif

@@ -18,6 +18,11 @@ el handling correcto
 
 */
 
+// Necesarias porque display no recibe parametros
+static ANI *g_anim = NULL;
+static LIST *g_curr = NULL;
+static int g_play = 0;
+
 CRD *initCoord(float x, float y, float z)
 {
     CRD *newC = (CRD*)malloc(sizeof(CRD));
@@ -630,7 +635,7 @@ GRAPH *generateBluePrint(char *sequenceName, QUEUE *objectSequence, int type)
     return newSequence;
 }
 
-OBJECT *instanceObject(OBJECT *template)
+OBJECT *instanceObject(OBJECT *tmplt)
 {
     /*
         Asi es, el bluePrint va aqui
@@ -641,26 +646,26 @@ OBJECT *instanceObject(OBJECT *template)
 
     */
 
-    OBJECT *newObj = initObject(template->objectName, template->layerName, NULL, template->figures); //Las figuras, el nombre y la capa se mantienen igual
+    OBJECT *newObj = initObject(tmplt->key, tmplt->layerKey, NULL, tmplt->figures); //Las figuras, el nombre y la capa se mantienen igual
     
     if(!newObj) 
         return NULL;
 
-    COORD *newPos = NULL, *newScale = NULL, *newRot = NULL;
+    CRD *newPos = NULL, *newScale = NULL, *newRot = NULL;
 
-    if(template->t)
+    if(tmplt->t)
     {
-        newPos   = initCoord(template->t->globalPos->x, template->t->globalPos->y, template->t->globalPos->z);
-        newScale = initCoord(template->t->scale->x, template->t->scale->y, template->t->scale->z);
-        newRot   = initCoord(template->t->rotation->x, template->t->rotation->y, template->t->rotation->z);
+        newPos   = initCoord(tmplt->t->globalPos->x, tmplt->t->globalPos->y, tmplt->t->globalPos->z);
+        newScale = initCoord(tmplt->t->scale->x, tmplt->t->scale->y, tmplt->t->scale->z);
+        newRot   = initCoord(tmplt->t->rotation->x, tmplt->t->rotation->y, tmplt->t->rotation->z);
         
-        newObj->t = initPhysics(template->t->colissionBox, newPos, newScale, newRot);
+        newObj->t = initPhysics(tmplt->t->colissionBox, newPos, newScale, newRot);
         
-        newObj->t->effectArea = template->t->effectArea;
+        newObj->t->effectArea = tmplt->t->effectArea;
     }
 
     LIST *previousStack = NULL;
-    LIST *iter = template->statusStack;
+    LIST *iter = tmplt->statusStack;
 
     // Volcar la pila
     while(iter)
@@ -673,15 +678,15 @@ OBJECT *instanceObject(OBJECT *template)
 
     while(previousStack)
     {
-        handleInsert(&newObj->statusStack,popData(&previousStack),0,SIMPLE)
+        handleInsert(&newObj->statusStack,popData(&previousStack),0,SIMPLE);
     }
 
     // Utilizamos los mismos estados porque al final solo guardaremose el dibujado, y el dibujado es independiente del estado,
     // lo que iteraremos es la Cola paneles, no la animacion en si, utilizamos el mismo stack para ahorrar memoria
     // y mantener integridad en la animacion
 
-    newObj->activeStatus = template->activeStatus;
-    newObj->currentFrame = template->currentFrame;
+    newObj->activeStatus = tmplt->activeStatus;
+    newObj->currentFrame = tmplt->currentFrame;
 
     return newObj;
 }
@@ -945,8 +950,6 @@ void Jump(struct object *self, int step, void *params, void *env)
 
     if(checkTriggers(self, p, env)) 
         return;
-    
-    // Se asume cambio de 
 
     p->friction = 0.95f;
 
@@ -993,7 +996,8 @@ void Fall(OBJECT *self, int step, void *params, void *env)
         return;
     }
 
-    if(checkTriggers(self, p, env)) return;
+    if(checkTriggers(self, p, env)) 
+        return;
 
     if(self->activeStatus && self->activeStatus->animSequence)
          advanceAutomata(self);
@@ -1001,7 +1005,7 @@ void Fall(OBJECT *self, int step, void *params, void *env)
 
 int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int frames)
 {
-    if(!toModify || !initialObjects || absolute)
+    if(!toModify || !initialObjects || !absolute)
         return -1;
 
     for(int i=0; i<frames; i++)
@@ -1022,10 +1026,10 @@ int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int fr
             OBJECT *current = (OBJECT*)objects->data;
 
             if(current->activeStatus && current->activeStatus->func)
-                current->activeStatus->func(current,i,current->activeStatus->params,nextPanel)  // Simulamos vida para la lista global de objetos 
-                                                                                                // esto es hermoso porque cada panel copia su propio estado de los objetos
-                                                                                                // al final de la animacion la lista esta lista para seguir con los estados anteriores
-                                                                                                // pero a lo mejor añadiendo nuevos triggers y asi la lista de objetos cambia de manera global
+                current->activeStatus->func(current,i,current->activeStatus->params,nextPanel->allObjects); // Simulamos vida para la lista global de objetos 
+                                                                                                            // esto es hermoso porque cada panel copia su propio estado de los objetos
+                                                                                                            // al final de la animacion la lista esta lista para seguir con los estados anteriores
+                                                                                                            // pero a lo mejor añadiendo nuevos triggers y asi la lista de objetos cambia de manera global
             objects = objects->next;
         }                       
 
@@ -1035,3 +1039,229 @@ int animationSimple(ANI *toModify, SCENE *absolute, LIST *initialObjects, int fr
     return 0;
 }
 
+void drawFigure(F *fig)
+{
+    if (!fig)
+        return;
+
+    glPushMatrix(); // Empujamos cambios loccales para la figura, solo
+                    // lo relativo a la figura se dibuja en la posicion de la figura
+
+    if (fig->relPos)
+        glTranslatef(fig->relPos->x, fig->relPos->y, fig->relPos->z);   // movemos a la posicion relativa de dibujado
+                                                                        // si nuestro objeto es una persona y el centro del objeto esta en su estomago
+                                                                        // no dibujamos la cabeza en su estomago, si no en la posicion relativa de la cabeza
+                                                                        // con su estomago (el centro)
+
+    if (fig->localRot)
+        glRotatef(fig->localRot->z, 0, 0, 1); // Rotamos respecto al eje Z para variedad de figuras,
+                                              // asi podemos hacer rombos y otras cosas
+
+    if (fig->color && fig->color->color)
+    {
+        glColor4f(fig->color->color->x, fig->color->color->y, fig->color->color->z, fig->color->transparency); // Aplicamose l color que usaremos
+    }
+    else
+    {
+        glColor3f(1, 1, 1);
+    }
+
+    GLenum mode = GL_POLYGON; // Todo es un poligono al final para reducir el dibujado
+                              // de esto me di cuenta cuando estaba implementando polygonOffSet
+                              // y decidi dejarlo asi para esta entrega final
+
+    if (fig->f == LINE) 
+        mode = GL_LINES;
+
+    glBegin(mode);
+
+    LIST *pNode = fig->offSet;
+    while (pNode)
+    {
+        CRD *p = (CRD*)pNode->data;
+        glVertex3f(p->x, p->y, p->z);   // Dibujamos donde va, sin hacer ni un solo calculo para el offSet
+        pNode = pNode->next;            // vivan las transformaciones matriciales
+    }
+
+    glEnd();
+
+    glPopMatrix();
+}
+
+void drawObject(OBJECT *obj)
+{
+    if (!obj || !obj->t)
+        return;
+
+    glPushMatrix();
+
+    // Estas 3 lineas por cada push/pop lo que nos dicen es basicamente
+    // Quiero dibujar mi objeto en X,Y (Translate)
+    // Quiero dibujarlo a N* de su posicion normal
+    // Quiero que tenga un tamaño de n*escala donde n es la escala inicial del objeto
+
+    glTranslatef(obj->t->globalPos->x, obj->t->globalPos->y, obj->t->globalPos->z); // Trasladamos
+    glRotatef(obj->t->rotation->z, 0, 0, 1);                                        // Rotamos      // Este orden es importante porque la combinatoria de estas operaciones da resultados
+    glScalef(obj->t->scale->x, obj->t->scale->y, 1);                                // Escalamos    // completamente distintos en cada caso, por algo es COMBINATORIA
+
+    LIST *fNode = obj->figures;
+    while (fNode)
+    {
+        drawFigure((F*)fNode->data);
+        fNode = fNode->next;
+    }
+
+    glPopMatrix(); // Pop porque los otros objetos tienen su dibujado propio
+}
+
+void display()
+{
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    if (!g_anim || !g_curr)
+        return;
+
+    PANEL *p = (PANEL*)g_curr->data;
+    SCENE *s = p->currentScene;
+
+    if (s)
+    {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(-s->width / 2, s->width / 2,-s->height / 2, s->height / 2, -1000, 1000);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        gluLookAt(0, 0, 1,
+                  0, 0, 0,
+                  0, 1, 0);
+    }
+
+    LIST *oNode = p->allObjects;
+    while (oNode)
+    {
+        drawObject((OBJECT*)oNode->data);
+        oNode = oNode->next;
+    }
+
+    glutSwapBuffers();
+}
+
+void reshape(int w, int h)
+{
+    if (h == 0)
+        h = 1;
+
+    glViewport(0, 0, w, h);
+}
+
+void timer(int v)
+{
+    if (g_play && g_anim)
+    {
+        if (g_curr && g_curr->next)
+        {
+            g_curr = g_curr->next;
+        }
+        else
+        {
+            g_curr = g_anim->panels->first;
+        }
+    }
+
+    glutPostRedisplay();
+    glutTimerFunc(16, timer, 0);
+}
+
+void keyboard(unsigned char key, int x, int y)
+{
+    if (key == 32)
+    {
+        g_play = !g_play;
+    }
+}
+
+void special(int key, int x, int y)
+{
+    if (!g_play && g_curr)
+    {
+        if (key == GLUT_KEY_RIGHT && g_curr->next)
+        {
+            g_curr = g_curr->next;
+        }
+        if (key == GLUT_KEY_LEFT && g_curr->prev)
+        {
+            g_curr = g_curr->prev;
+        }
+        glutPostRedisplay();
+    }
+}
+
+void startGraphicsLoop(ANI *ani, int argc, char **argv, char *title)
+{
+    if (!ani || !ani->panels || !ani->panels->first)
+        return;
+
+    g_anim = ani;
+    g_curr = ani->panels->first;
+
+    glutInit(&argc, argv);
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
+    glutInitWindowSize(800, 600);
+    glutCreateWindow(title);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    glutDisplayFunc(display);
+    glutReshapeFunc(reshape);
+    glutKeyboardFunc(keyboard);
+    glutSpecialFunc(special);
+    glutTimerFunc(0, timer, 0);
+
+    glutMainLoop();
+}
+
+int checkVision(OBJECT *self, void *env)
+{
+    if (!self || !self->t || !env)
+        return 0;
+
+    // Casteo a lista porque animationSimple pasa la lista de objetos vivos
+    LIST *iter = (LIST*)env;
+
+    // Definimos el rango de vision hacia la derecha (X positivo)
+    // 5.0f es la distancia de vision (ajustable)
+    float visionRange = 6.0f;
+    float myX = self->t->globalPos->x;
+    float myY = self->t->globalPos->y;
+
+    while (iter)
+    {
+        OBJECT *other = (OBJECT*)iter->data;
+
+        // Ignorar a uno mismo y objetos sin cuerpo fisico
+        if (other != self && other->t->colissionBox)
+        {
+            float otherX = other->t->globalPos->x;
+            float otherY = other->t->globalPos->y;
+
+            // 1. Chequeo Vertical: ¿Esta en mi carril? (Misma altura aprox)
+            if (fabs(myY - otherY) < (self->maxY + other->maxY))
+            {
+                // 2. Chequeo Horizontal: ¿Esta delante de mi?
+                float dist = otherX - myX;
+
+                // Si esta adelante (dist > 0) y dentro del rango
+                if (dist > 0 && dist < visionRange)
+                {
+                    return 1; // Detectado
+                }
+            }
+        }
+        iter = iter->next;
+    }
+
+    return 0;
+}

@@ -78,12 +78,18 @@ int insertEhash(EHASH **chainingList, char *key, void *pair)
 
 EHASH *hashing(HASH *hT, char *key)
 {
+    if(!hT)
+        return NULL;
+    
     int index = hashFunction(key, hT->maxSpace);
     EHASH *element = hT->elements[index];
 
-    while (element)
+    while(element)
     {
-        if (!strcmp(key, element->key))
+        if(!key || !element->key)
+            return NULL;
+
+        if(!strcmp(key, element->key))
             return element;
         element = element->next;
     }
