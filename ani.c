@@ -22,6 +22,7 @@ el handling correcto
 static ANI *g_anim = NULL;
 static LIST *g_curr = NULL;
 static int g_play = 0;
+static int g_toggle = 0;
 
 CRD *initCoord(float x, float y, float z)
 {
@@ -1115,6 +1116,12 @@ void drawObject(OBJECT *obj)
     glTranslatef(obj->t->globalPos->x, obj->t->globalPos->y, obj->t->globalPos->z); // Trasladamos
     glRotatef(obj->t->rotation->z, 0, 0, 1);                                        // Rotamos      // Este orden es importante porque la combinatoria de estas operaciones da resultados
     glScalef(obj->t->scale->x, obj->t->scale->y, 1);                                // Escalamos    // completamente distintos en cada caso, por algo es COMBINATORIA
+
+    if(obj->t->colissionBox && g_toggle)
+        drawFigure(obj->t->colissionBox);
+
+    if(obj->t->effectArea && g_toggle)
+        drawFigure(obj->t->effectArea);
 
     LIST *fNode = obj->figures;
     while (fNode)
