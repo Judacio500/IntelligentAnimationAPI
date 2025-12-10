@@ -22,6 +22,7 @@ el handling correcto
 static ANI *g_anim = NULL;
 static LIST *g_curr = NULL;
 static int g_play = 0;
+static int g_toggle = 0;
 
 CRD *initCoord(float x, float y, float z)
 {
@@ -469,7 +470,7 @@ F *generateColission(enum figures figType, float arg1, float arg2)
     if(!offSet)
         return NULL;
 
-    CRD *pos = initCoord(0, 0, 0);
+    CRD *pos = initCoord(0, 0, 1);
 
     if(!pos)
         return NULL;
@@ -483,7 +484,9 @@ F *generateColission(enum figures figType, float arg1, float arg2)
         return NULL;
     }
 
-    F *newF = initFigure(offSet,NULL,pos,rot,figType);
+    DESIGN *d = initDesign(1,0,0,0.1);
+
+    F *newF = initFigure(offSet,d,pos,rot,figType);
 
     return newF;
 }
@@ -567,8 +570,6 @@ PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects)
         LAYER *targetLayer = NULL;
         EHASH *found = hashing(newP->layers, obj->layerKey);
 
-        printf("No es el hashing para %s", obj->key);
-
         if(found)
         {
             targetLayer = (LAYER*)found->pair;
@@ -649,14 +650,6 @@ OBJECT *instanceObject(OBJECT *tmplt)
     */
 
     OBJECT *newObj = initObject(tmplt->key, tmplt->layerKey, NULL, tmplt->figures); //Las figuras, el nombre y la capa se mantienen igual
-    
-
-    printf("\n\nPara %s\n", tmplt->key);
-    if(newObj->key && newObj->layerKey)
-        puts("Se copio la llave");
-    else
-        puts("No se copio la llave");
-
 
     if(!newObj) 
         return NULL;
@@ -698,8 +691,6 @@ OBJECT *instanceObject(OBJECT *tmplt)
     newObj->activeStatus = tmplt->activeStatus;
     newObj->currentFrame = tmplt->currentFrame;
 
-    printf("\nSe copio bien la posicion\n");
-
     return newObj;
 }
 
@@ -713,41 +704,97 @@ STATUS *getBase(Behavior func)
 
 int checkGround(OBJECT *self, void *env)
 {
-    if(!self || !env) 
-        return 0;
-    
-    PANEL *p = (PANEL*)env;
-    
-    float myY = self->t->globalPos->y;
-    float myBottom = myY - self->maxY;
-    float myX = self->t->globalPos->x;
+    // Fix Rápido: 'env' ahora asumimos que es directamente la LISTA de objetos
+    if(!self || !env) return 0;
 
-    LIST *iter = p->allObjects; 
+    // YA NO HACEMOS ESTO: PANEL *p = (PANEL*)env;
+    // HACEMOS ESTO:
+    LIST *iter = (LIST*)env; 
+
+    // 1. OBTENER BORDES DEL HÉROE (Sistema Y-UP)
+    float hMinX, hMaxX, hMinY, hMaxY;
+    getCollisionBounds(self, &hMinX, &hMaxX, &hMinY, &hMaxY);
+    
+    // hMinY = Mis Pies (Borde inferior)
+
     while(iter)
     {
         OBJECT *other = (OBJECT*)iter->data;
         
-        // Ignorar self y objetos sin colision
+        // Ignoramos self y objetos sin colisión
         if(other != self && other->t->colissionBox)
         {
-            float otherX = other->t->globalPos->x;
-            float otherMaxX = other->maxX; 
-            
-            if (fabs(myX - otherX) < (self->maxX + otherMaxX))
-            {
-                float otherTop = other->t->globalPos->y + other->maxY;
-                float penetration = otherTop - myBottom;
+            // 2. OBTENER BORDES DEL OBSTÁCULO
+            float oMinX, oMaxX, oMinY, oMaxY;
+            getCollisionBounds(other, &oMinX, &oMaxX, &oMinY, &oMaxY);
 
-                if (penetration >= 0 && penetration < 10) 
+            // oMaxY = Superficie del Suelo (Borde superior)
+
+            // 3. INTERSECCIÓN AABB
+            int overlapX = (hMaxX > oMinX) && (hMinX < oMaxX);
+            int overlapY = (hMaxY > oMinY) && (hMinY < oMaxY);
+
+            if (overlapX && overlapY)
+            {
+                // 4. CALCULO DE PENETRACIÓN (Y-UP)
+                // Cuánto bajaron mis pies (hMinY) de la superficie (oMaxY)
+                float penetration = oMaxY - hMinY;
+
+                // Margen de seguridad (ej. 50px)
+                if (penetration > 0 && penetration < 50.0f) 
                 {
-                    self->t->globalPos->y = otherTop + self->maxY;
-                    return 1; 
+                    // SNAP: Sumamos para subir (Sistema Y-UP)
+                    self->t->globalPos->y += penetration;
+                    
+                    return 1;
                 }
             }
         }
         iter = iter->next;
     }
     return 0;
+}
+
+// Función auxiliar para obtener los límites reales de la caja de colisión en el mundo
+void getCollisionBounds(OBJECT *obj, float *minX, float *maxX, float *minY, float *maxY)
+{
+    // Valores iniciales "imposibles" para encontrar min/max
+    *minX = 100000.0f; *maxX = -100000.0f;
+    *minY = 100000.0f; *maxY = -100000.0f;
+
+    // Si no hay caja de colisión explícita, usamos un fallback al centro (o podrías retornar error)
+    if (!obj || !obj->t || !obj->t->colissionBox || !obj->t->colissionBox->offSet) 
+    {
+        // Fallback: Usamos la posición global +/- 10px si no hay caja definida
+        *minX = obj->t->globalPos->x - 10;
+        *maxX = obj->t->globalPos->x + 10;
+        *minY = obj->t->globalPos->y - 10;
+        *maxY = obj->t->globalPos->y + 10;
+        return;
+    }
+
+    struct fig *box = obj->t->colissionBox;
+    float globalX = obj->t->globalPos->x;
+    float globalY = obj->t->globalPos->y;
+    float scaleX = obj->t->scale->x; // Asumiendo que quieres que la caja escale
+    float scaleY = obj->t->scale->y;
+
+    LIST *pIter = box->offSet;
+    while(pIter)
+    {
+        CRD *p = (CRD*)pIter->data; // Tus coordenadas locales
+        
+        // Transformación: Local * Escala + PosiciónGlobal + PosiciónRelativaDeLaCaja
+        float worldX = (p->x * scaleX) + box->relPos->x + globalX;
+        float worldY = (p->y * scaleY) + box->relPos->y + globalY;
+
+        if (worldX < *minX) *minX = worldX;
+        if (worldX > *maxX) *maxX = worldX;
+        if (worldY < *minY) *minY = worldY;
+        if (worldY > *maxY) *maxY = worldY;
+
+        pIter = pIter->next;
+    }
 }
 
 void calculateDimensions(OBJECT *obj)
@@ -1116,6 +1163,12 @@ void drawObject(OBJECT *obj)
     glRotatef(obj->t->rotation->z, 0, 0, 1);                                        // Rotamos      // Este orden es importante porque la combinatoria de estas operaciones da resultados
     glScalef(obj->t->scale->x, obj->t->scale->y, 1);                                // Escalamos    // completamente distintos en cada caso, por algo es COMBINATORIA
 
+    if(obj->t->colissionBox && g_toggle)
+        drawFigure(obj->t->colissionBox);
+
+    if(obj->t->effectArea && g_toggle)
+        drawFigure(obj->t->effectArea);
+
     LIST *fNode = obj->figures;
     while (fNode)
     {
@@ -1187,10 +1240,19 @@ void timer(int v)
 
 void keyboard(unsigned char key, int x, int y)
 {
-    if (key == 32)
+    switch(key)
     {
-        g_play = !g_play;
+        case 32:
+            g_play = !g_play;
+            break;
+        
+        case 't':
+        case 'T':
+            g_toggle = !g_toggle;
+            break;
+
     }
+    
 }
 
 void special(int key, int x, int y)

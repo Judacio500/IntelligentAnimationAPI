@@ -259,6 +259,7 @@ int advanceAutomata(OBJECT *obj);
 void physicsUpdate(OBJECT *self, GP *p);
 int checkTriggers(OBJECT *self, GP *params, void *env);
 int checkGround(OBJECT *self, void *env);
+void getCollisionBounds(OBJECT *obj, float *minX, float *maxX, float *minY, float *maxY);
 
 // OpenGL
 void drawFigure(F *fig);
