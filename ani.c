@@ -567,6 +567,8 @@ PANEL *generatePanelFromObjects(SCENE *camera, LIST *objects)
         LAYER *targetLayer = NULL;
         EHASH *found = hashing(newP->layers, obj->layerKey);
 
+        printf("No es el hashing para %s", obj->key);
+
         if(found)
         {
             targetLayer = (LAYER*)found->pair;
@@ -648,6 +650,14 @@ OBJECT *instanceObject(OBJECT *tmplt)
 
     OBJECT *newObj = initObject(tmplt->key, tmplt->layerKey, NULL, tmplt->figures); //Las figuras, el nombre y la capa se mantienen igual
     
+
+    printf("\n\nPara %s\n", tmplt->key);
+    if(newObj->key && newObj->layerKey)
+        puts("Se copio la llave");
+    else
+        puts("No se copio la llave");
+
+
     if(!newObj) 
         return NULL;
 
@@ -687,6 +697,8 @@ OBJECT *instanceObject(OBJECT *tmplt)
 
     newObj->activeStatus = tmplt->activeStatus;
     newObj->currentFrame = tmplt->currentFrame;
+
+    printf("\nSe copio bien la posicion\n");
 
     return newObj;
 }

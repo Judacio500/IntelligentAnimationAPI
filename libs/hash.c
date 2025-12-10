@@ -8,7 +8,7 @@ HASH *initHash(int maxSpace)
     HASH *newH = (HASH*)malloc(sizeof(HASH));
     if (!newH)
         return NULL;
-    if (maxSpace > 5)
+    if (maxSpace > 12)
         return NULL;
 
     newH->maxSpace = maxSpace;
@@ -33,16 +33,21 @@ EHASH *newElem(char *key, void *pair)
     return newE;
 }
 
-int hashFunction(char *key, int maxSpace) // JDB2
+
+// TE ODIO JDB2
+// POR TU INSOLENCIA TE VOY A DEPRECAR EN LA SIGUIENTE VERSION DE HASH.H
+// (Es totalmente culpa mia no te voy a deprecar)
+int hashFunction(char *key, int maxSpace)
 {
-    int hash = 5381;
-    char *c = key;
-    while (*c != '\0')
-    {
-        hash = hash * 33 + *c;
+    unsigned long hash = 5381; 
+    unsigned char *c = (unsigned char *)key;    // No eran unsigned
+                                                
+    while (*c != '\0') {
+        hash = ((hash << 5) + hash) + *c; 
         c++;
     }
-    return hash % primeNumbers[maxSpace];
+    
+    return (int)(hash % primeNumbers[maxSpace]);
 }
 
 int saveKey(HASH **hT, char *key, void *pair)
